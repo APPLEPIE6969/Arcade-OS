@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="color-scheme" content="dark" />
+  <title>Asteroid Storm 3D</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #04050a; color: #e8f4ff;
+      font-family: "Courier New", ui-monospace, monospace;
+      overflow: hidden;
+      -webkit-user-select: none; user-select: none;
+      cursor: crosshair;
+    }
+    #wrap { position: fixed; inset: 0; }
+    canvas { display: block; width: 100% !important; height: 100% !important; }
+
+    .hud {
+      position: absolute; top: 0; left: 0; right: 0;
+      padding: 14px 18px;
+      display: flex; justify-content: space-between;
+      pointer-events: none; z-index: 5;
+      font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .hud-block {
+      background: rgba(4, 5, 10, 0.55);
+      border: 1px solid rgba(34, 211, 238, 0.25);
+      border-radius: 6px; padding: 6px 10px;
+      backdrop-filter: blur(6px);
+    }
+    .hud-label { color: rgba(232, 244, 255, 0.55); font-size: 9px; margin-bottom: 2px; }
+    .hud-value { color: #22d3ee; font-weight: bold; font-size: 16px; text-shadow: 0 0 8px rgba(34,211,238,0.7); }
+    .hud-value.magenta { color: #f472b6; text-shadow: 0 0 8px rgba(244,114,182,0.7); }
+    .hud-value.yellow { color: #facc15; text-shadow: 0 0 8px rgba(250,204,21,0.7); }
+    .hud-value.green { color: #4ade80; text-shadow: 0 0 8px rgba(74,222,128,0.7); }
+
+    /* Crosshair */
+    .crosshair {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px; height: 40px;
+      pointer-events: none; z-index: 6;
+    }
+    .crosshair::before, .crosshair::after {
+      content: ""; position: absolute; background: #22d3ee;
+      box-shadow: 0 0 8px rgba(34,211,238,0.9);
+    }
+    .crosshair::before { top: 50%; left: 0; width: 100%; height: 1.5px; transform: translateY(-50%); }
+    .crosshair::after { left: 50%; top: 0; width: 1.5px; height: 100%; transform: translateX(-50%); }
+    .crosshair-dot {
+      position: absolute; top: 50%; left: 50%;
+      width: 4px; height: 4px; border-radius: 50%;
+      background: #f472b6; transform: translate(-50%, -50%);
+      box-shadow: 0 0 8px rgba(244,114,182,0.9);
+    }
+
+    /* Cockpit frame overlay */
+    .cockpit-frame {
+      position: absolute; inset: 0;
+      pointer-events: none; z-index: 4;
+      background:
+        radial-gradient(ellipse 90% 70% at center, transparent 60%, rgba(4,5,10,0.6) 100%);
+    }
+    .cockpit-frame::before, .cockpit-frame::after {
+      content: ""; position: absolute;
+      border: 2px solid rgba(34, 211, 238, 0.3);
+    }
+    .cockpit-frame::before {
+      left: 0; top: 0; width: 80px; height: 80px;
+      border-right: none; border-bottom: none;
+    }
+    .cockpit-frame::after {
+      right: 0; bottom: 0; width: 80px; height: 80px;
+      border-left: none; border-top: none;
+    }
+
+    .overlay {
+      position: absolute; inset: 0; z-index: 10;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; padding: 24px; text-align: center;
+      background: radial-gradient(ellipse at center, rgba(4,5,10,0.8), rgba(4,5,10,0.95));
+    }
+    .overlay.hidden { display: none; }
+    .overlay h1 {
+      font-size: clamp(28px, 5vw, 56px); letter-spacing: 0.12em;
+      color: #22d3ee;
+      text-shadow: 0 0 18px rgba(34, 211, 238, 0.85), 0 0 4px rgba(34, 211, 238, 0.95);
+    }
+    .overlay h1 .accent { color: #f472b6; text-shadow: 0 0 18px rgba(244,114,182,0.85); }
+    .overlay p { font-size: 12px; letter-spacing: 0.06em; color: rgba(232,244,255,0.65); max-width: 560px; line-height: 1.6; }
+    .overlay .stats-line {
+      display: flex; gap: 24px; flex-wrap: wrap; justify-content: center;
+      font-size: 11px; color: rgba(232,244,255,0.5); margin-top: 4px;
+    }
+    .overlay .stats-line span { color: #facc15; font-weight: bold; }
+    .controls-list { display: grid; grid-template-columns: auto auto; gap: 6px 14px; font-size: 12px; color: rgba(232,244,255,0.75); }
+    .controls-list .key { color: #facc15; font-weight: bold; text-align: right; }
+    .start-btn {
+      margin-top: 6px; padding: 12px 28px; background: transparent;
+      border: 2px solid #22d3ee; color: #22d3ee;
+      font-family: inherit; font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase;
+      cursor: pointer; border-radius: 6px; transition: all 0.18s ease;
+      box-shadow: 0 0 14px rgba(34,211,238,0.35), inset 0 0 14px rgba(34,211,238,0.1);
+    }
+    .start-btn:hover { background: rgba(34,211,238,0.12); transform: translateY(-1px); }
+    .final-score { font-size: 14px; color: #facc15; letter-spacing: 0.1em; text-transform: uppercase; }
+    .final-score span { color: #f472b6; font-weight: bold; font-size: 1.4em; text-shadow: 0 0 10px rgba(244,114,182,0.7); }
+    .hint {
+      position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;
+      font-size: 10px; letter-spacing: 0.18em; color: rgba(232,244,255,0.35);
+      pointer-events: none; z-index: 5; text-transform: uppercase;
+    }
+    #fps-meter {
+      position: absolute; bottom: 10px; right: 14px; z-index: 5;
+      font-size: 10px; color: rgba(74,222,128,0.7);
+      font-family: "Courier New", monospace;
+      letter-spacing: 0.1em;
+      pointer-events: none;
+    }
+  </style>
+
+  <!-- Three.js r160 loaded as an ES module via importmap -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="wrap">
+    <div class="cockpit-frame"></div>
+    <div class="crosshair"><div class="crosshair-dot"></div></div>
+
+    <div class="hud">
+      <div class="hud-block">
+        <div class="hud-label">Score</div>
+        <div class="hud-value" id="score">0</div>
+      </div>
+      <div class="hud-block" style="text-align:center;">
+        <div class="hud-label">Asteroids</div>
+        <div class="hud-value yellow" id="count">12000</div>
+      </div>
+      <div class="hud-block" style="text-align:right;">
+        <div class="hud-label">Hull</div>
+        <div class="hud-value green" id="hull">100%</div>
+      </div>
+    </div>
+
+    <div class="hint">Mouse aim · WASD strafe · Click fire · R restart</div>
+    <div id="fps-meter">-- fps</div>
+
+    <div class="overlay" id="start-overlay">
+      <h1>ASTEROID <span class="accent">STORM 3D</span></h1>
+      <p>A true WebGL cockpit shooter. Pilot through a field of <strong style="color:#facc15;">12,000 instanced asteroids</strong> — rendered in a single GPU draw call via Three.js InstancedMesh. Hunt the red hostiles, dodge the cyan debris, survive as long as you can.</p>
+      <div class="controls-list">
+        <div class="key">MOUSE</div><div>Aim reticle / look</div>
+        <div class="key">W A S D</div><div>Strafe through space</div>
+        <div class="key">CLICK</div><div>Fire plasma bolt</div>
+        <div class="key">R</div><div>Restart after destruction</div>
+      </div>
+      <div class="stats-line">
+        <div>Engine: <span>Three.js r160</span></div>
+        <div>Instances: <span>12,000</span></div>
+        <div>Draw calls: <span>1</span></div>
+      </div>
+      <button class="start-btn" id="start-btn">Launch Cockpit</button>
+    </div>
+
+    <div class="overlay hidden" id="gameover-overlay">
+      <h1>HULL <span class="accent">BREACH</span></h1>
+      <div class="final-score">Final Score: <span id="final-score">0</span></div>
+      <p>Press <strong style="color:#facc15;">R</strong> or click below to redeploy.</p>
+      <button class="start-btn" id="restart-btn">Redeploy</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from "three";
+
+    /* =====================================================================
+       ASTEROID STORM 3D — Three.js InstancedMesh showcase.
+       12,000 asteroids rendered as a single InstancedMesh (1 draw call).
+       ===================================================================== */
+
+    const STATE = { MENU: "menu", PLAYING: "playing", GAMEOVER: "gameover" };
+    let state = STATE.MENU;
+
+    // ----- Renderer / scene / camera -----
+    const wrap = document.getElementById("wrap");
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x04050a, 1);
+    wrap.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x04050a, 0.0008);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 4000);
+    camera.position.set(0, 0, 0);
+
+    // ----- Lighting -----
+    const ambient = new THREE.AmbientLight(0x4a5a7a, 0.6);
+    scene.add(ambient);
+    const keyLight = new THREE.DirectionalLight(0x22d3ee, 1.0);
+    keyLight.position.set(500, 800, 600);
+    scene.add(keyLight);
+    const rimLight = new THREE.DirectionalLight(0xf472b6, 0.6);
+    rimLight.position.set(-600, -200, -400);
+    scene.add(rimLight);
+
+    // ----- Starfield background (Points, 5000 stars) -----
+    const starCount = 5000;
+    const starGeo = new THREE.BufferGeometry();
+    const starPos = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount; i++) {
+      const r = 2000;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      starPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      starPos[i * 3 + 2] = r * Math.cos(phi);
+    }
+    starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+    const starMat = new THREE.PointsMaterial({ color: 0x9ad7ff, size: 2, sizeAttenuation: false, transparent: true, opacity: 0.7 });
+    const stars = new THREE.Points(starGeo, starMat);
+    scene.add(stars);
+
+    // ----- The InstancedMesh: 12,000 asteroids, ONE draw call -----
+    const ASTEROID_COUNT = 12000;
+    const asteroidGeo = new THREE.IcosahedronGeometry(1, 0); // low-poly sphere — cheap and looks rocky
+    const asteroidMat = new THREE.MeshStandardMaterial({
+      metalness: 0.35,
+      roughness: 0.75,
+      vertexColors: false,
+      flatShading: true,
+    });
+    const asteroidMesh = new THREE.InstancedMesh(asteroidGeo, asteroidMat, ASTEROID_COUNT);
+    asteroidMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(asteroidMesh);
+
+    // Per-instance color buffer — lets us tint hostiles red without a second mesh
+    const colorBuffer = new Float32Array(ASTEROID_COUNT * 3);
+    asteroidMesh.instanceColor = new THREE.InstancedBufferAttribute(colorBuffer, 3);
+
+    // Per-instance data: position, velocity, scale, rotation, hostile flag, alive flag
+    const instanceData = [];
+    const dummy = new THREE.Object3D();
+    const tmpColor = new THREE.Color();
+
+    function initAsteroids() {
+      for (let i = 0; i < ASTEROID_COUNT; i++) {
+        // Distribute asteroids in a large cube volume around the player
+        const x = (Math.random() - 0.5) * 1600;
+        const y = (Math.random() - 0.5) * 1600;
+        const z = (Math.random() - 0.5) * 1600;
+        const scale = 4 + Math.random() * 18;
+        const hostile = Math.random() < 0.12; // ~12% hostile
+        instanceData[i] = {
+          x: x, y: y, z: z,
+          vx: (Math.random() - 0.5) * 8,
+          vy: (Math.random() - 0.5) * 8,
+          vz: (Math.random() - 0.5) * 8,
+          scale: scale,
+          rx: Math.random() * Math.PI * 2,
+          ry: Math.random() * Math.PI * 2,
+          rz: Math.random() * Math.PI * 2,
+          rvx: (Math.random() - 0.5) * 0.4,
+          rvy: (Math.random() - 0.5) * 0.4,
+          rvz: (Math.random() - 0.5) * 0.4,
+          hostile: hostile,
+          alive: true,
+          pulse: Math.random() * Math.PI * 2,
+        };
+        // Set initial matrix
+        dummy.position.set(x, y, z);
+        dummy.rotation.set(instanceData[i].rx, instanceData[i].ry, instanceData[i].rz);
+        dummy.scale.set(scale, scale, scale);
+        dummy.updateMatrix();
+        asteroidMesh.setMatrixAt(i, dummy.matrix);
+        // Set color: cyan for neutral, magenta/red for hostile
+        if (hostile) {
+          tmpColor.setHex(0xf472b6);
+        } else {
+          tmpColor.setHex(0x22d3ee);
+        }
+        asteroidMesh.setColorAt(i, tmpColor);
+      }
+      asteroidMesh.instanceMatrix.needsUpdate = true;
+      asteroidMesh.instanceColor.needsUpdate = true;
+    }
+    initAsteroids();
+
+    // ----- Bullets (small InstancedMesh pool, 64 max) -----
+    const BULLET_MAX = 64;
+    const bulletGeo = new THREE.SphereGeometry(0.8, 8, 8);
+    const bulletMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    const bulletMesh = new THREE.InstancedMesh(bulletGeo, bulletMat, BULLET_MAX);
+    bulletMesh.count = 0;
+    bulletMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(bulletMesh);
+    const bullets = []; // {x,y,z,vx,vy,vz,life}
+    const bulletDummy = new THREE.Object3D();
+
+    // ----- Player state -----
+    const player = {
+      position: new THREE.Vector3(0, 0, 0),
+      velocity: new THREE.Vector3(0, 0, 0),
+      yaw: 0,
+      pitch: 0,
+      hull: 100,
+      cooldown: 0,
+      fireRate: 0.18,
+      invuln: 0,
+    };
+
+    let score = 0;
+    let best = 0;
+    try { best = parseInt(localStorage.getItem("asteroid-storm-best") || "0", 10) || 0; } catch (e) {}
+
+    // ----- Input -----
+    const keys = Object.create(null);
+    let mouseDown = false;
+    let mouseNX = 0, mouseNY = 0; // normalized -1..1
+
+    window.addEventListener("keydown", function (e) {
+      keys[e.key.toLowerCase()] = true;
+      if (e.key.toLowerCase() === "r" && state === STATE.GAMEOVER) startGame();
+    });
+    window.addEventListener("keyup", function (e) {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    renderer.domElement.addEventListener("mousemove", function (e) {
+      // Use mouse delta from center for ship yaw/pitch
+      mouseNX = (e.clientX / window.innerWidth) * 2 - 1;
+      mouseNY = (e.clientY / window.innerHeight) * 2 - 1;
+    });
+    renderer.domElement.addEventListener("mousedown", function () { mouseDown = true; });
+    renderer.domElement.addEventListener("mouseup", function () { mouseDown = false; });
+    // Touch fallback
+    renderer.domElement.addEventListener("touchstart", function (e) {
+      e.preventDefault();
+      mouseDown = true;
+      const t = e.touches[0];
+      mouseNX = (t.clientX / window.innerWidth) * 2 - 1;
+      mouseNY = (t.clientY / window.innerHeight) * 2 - 1;
+    }, { passive: false });
+    renderer.domElement.addEventListener("touchmove", function (e) {
+      e.preventDefault();
+      const t = e.touches[0];
+      mouseNX = (t.clientX / window.innerWidth) * 2 - 1;
+      mouseNY = (t.clientY / window.innerHeight) * 2 - 1;
+    }, { passive: false });
+    renderer.domElement.addEventListener("touchend", function () { mouseDown = false; });
+
+    // ----- Resize -----
+    function onResize() {
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener("resize", onResize);
+
+    // ----- Game lifecycle -----
+    function startGame() {
+      score = 0;
+      player.position.set(0, 0, 0);
+      player.velocity.set(0, 0, 0);
+      player.yaw = 0;
+      player.pitch = 0;
+      player.hull = 100;
+      player.cooldown = 0;
+      player.invuln = 1.5;
+      bullets.length = 0;
+      bulletMesh.count = 0;
+      // Re-scatter asteroids
+      initAsteroids();
+      state = STATE.PLAYING;
+      document.getElementById("start-overlay").classList.add("hidden");
+      document.getElementById("gameover-overlay").classList.add("hidden");
+      lastTime = performance.now();
+    }
+
+    function endGame() {
+      state = STATE.GAMEOVER;
+      if (score > best) {
+        best = score;
+        try { localStorage.setItem("asteroid-storm-best", String(best)); } catch (e) {}
+      }
+      document.getElementById("final-score").textContent = score;
+      document.getElementById("gameover-overlay").classList.remove("hidden");
+    }
+
+    document.getElementById("start-btn").addEventListener("click", startGame);
+    document.getElementById("restart-btn").addEventListener("click", startGame);
+
+    // ----- Fire -----
+    function fireBullet() {
+      if (player.cooldown > 0) return;
+      player.cooldown = player.fireRate;
+      // Forward direction based on yaw/pitch
+      const fwd = new THREE.Vector3(
+        -Math.sin(player.yaw) * Math.cos(player.pitch),
+        Math.sin(player.pitch),
+        -Math.cos(player.yaw) * Math.cos(player.pitch)
+      );
+      bullets.push({
+        x: player.position.x + fwd.x * 4,
+        y: player.position.y + fwd.y * 4,
+        z: player.position.z + fwd.z * 4,
+        vx: fwd.x * 600,
+        vy: fwd.y * 600,
+        vz: fwd.z * 600,
+        life: 2.0,
+      });
+    }
+
+    // ----- Update -----
+    let lastTime = performance.now();
+    let fpsAccum = 0, fpsFrames = 0, fpsDisplay = 0, fpsTimer = 0;
+
+    function update(dt) {
+      // FPS counter
+      fpsAccum += dt;
+      fpsFrames++;
+      fpsTimer += dt;
+      if (fpsTimer >= 0.5) {
+        fpsDisplay = Math.round(fpsFrames / fpsAccum);
+        fpsAccum = 0; fpsFrames = 0; fpsTimer = 0;
+        document.getElementById("fps-meter").textContent = fpsDisplay + " fps · 1 draw call · " + ASTEROID_COUNT + " instances";
+      }
+
+      // Slowly rotate starfield for parallax
+      stars.rotation.y += dt * 0.005;
+
+      if (state !== STATE.PLAYING) return;
+
+      // Player aim — mouse position relative to center drives yaw/pitch
+      const aimSpeed = 1.6;
+      player.yaw -= mouseNX * dt * aimSpeed;
+      player.pitch -= mouseNY * dt * aimSpeed;
+      player.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, player.pitch));
+
+      // WASD strafing in camera-local frame
+      const forward = new THREE.Vector3(
+        -Math.sin(player.yaw) * Math.cos(player.pitch),
+        Math.sin(player.pitch),
+        -Math.cos(player.yaw) * Math.cos(player.pitch)
+      );
+      const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+      const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+
+      const moveSpeed = 120;
+      const accel = new THREE.Vector3();
+      if (keys["w"]) accel.add(forward.clone().multiplyScalar(moveSpeed));
+      if (keys["s"]) accel.add(forward.clone().multiplyScalar(-moveSpeed));
+      if (keys["a"]) accel.add(right.clone().multiplyScalar(-moveSpeed));
+      if (keys["d"]) accel.add(right.clone().multiplyScalar(moveSpeed));
+      if (keys[" "]) accel.add(up.clone().multiplyScalar(moveSpeed));
+
+      player.velocity.add(accel.multiplyScalar(dt));
+      player.velocity.multiplyScalar(0.92); // damping
+      player.position.add(player.velocity.clone().multiplyScalar(dt));
+
+      // Camera follows player + looks toward yaw/pitch
+      camera.position.copy(player.position);
+      camera.rotation.order = "YXZ";
+      camera.rotation.y = player.yaw;
+      camera.rotation.x = player.pitch;
+
+      // Firing
+      player.cooldown = Math.max(0, player.cooldown - dt);
+      if (mouseDown) fireBullet();
+      if (player.invuln > 0) player.invuln -= dt;
+
+      // Update bullets
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        b.z += b.vz * dt;
+        b.life -= dt;
+        if (b.life <= 0) {
+          bullets.splice(i, 1);
+          continue;
+        }
+        // Hit detection against nearby asteroids (sphere check on a subset)
+        for (let j = 0; j < ASTEROID_COUNT; j++) {
+          const a = instanceData[j];
+          if (!a.alive) continue;
+          const dx = a.x - b.x;
+          const dy = a.y - b.y;
+          const dz = a.z - b.z;
+          const r = a.scale + 2;
+          if (dx*dx + dy*dy + dz*dz < r * r) {
+            // Hit!
+            a.alive = false;
+            // Hide instance by scaling to 0
+            dummy.position.set(0, -100000, 0);
+            dummy.scale.set(0, 0, 0);
+            dummy.updateMatrix();
+            asteroidMesh.setMatrixAt(j, dummy.matrix);
+            asteroidMesh.instanceMatrix.needsUpdate = true;
+            score += a.hostile ? 100 : 25;
+            bullets.splice(i, 1);
+            break;
+          }
+        }
+      }
+      // Sync bullet InstancedMesh
+      bulletMesh.count = bullets.length;
+      for (let i = 0; i < bullets.length; i++) {
+        const b = bullets[i];
+        bulletDummy.position.set(b.x, b.y, b.z);
+        bulletDummy.scale.set(1, 1, 1);
+        bulletDummy.updateMatrix();
+        bulletMesh.setMatrixAt(i, bulletDummy.matrix);
+      }
+      if (bullets.length > 0) bulletMesh.instanceMatrix.needsUpdate = true;
+
+      // Update asteroids — drift + rotate + recycle when too far
+      const recycleDist = 1000;
+      for (let i = 0; i < ASTEROID_COUNT; i++) {
+        const a = instanceData[i];
+        if (!a.alive) continue;
+        a.x += a.vx * dt;
+        a.y += a.vy * dt;
+        a.z += a.vz * dt;
+        a.rx += a.rvx * dt;
+        a.ry += a.rvy * dt;
+        a.rz += a.rvz * dt;
+
+        // Recycle asteroids that drift too far — wrap to other side of player
+        const dx = a.x - player.position.x;
+        const dy = a.y - player.position.y;
+        const dz = a.z - player.position.z;
+        if (Math.abs(dx) > recycleDist) a.x -= Math.sign(dx) * recycleDist * 2;
+        if (Math.abs(dy) > recycleDist) a.y -= Math.sign(dy) * recycleDist * 2;
+        if (Math.abs(dz) > recycleDist) a.z -= Math.sign(dz) * recycleDist * 2;
+
+        // Hostile pulse — color flicker
+        if (a.hostile) {
+          a.pulse += dt * 6;
+          const pulse = 0.6 + Math.sin(a.pulse) * 0.4;
+          tmpColor.setRGB(0.95, 0.45 * pulse, 0.65 * pulse);
+          asteroidMesh.setColorAt(i, tmpColor);
+
+          // Hostiles actively home toward the player slowly
+          const homing = 4;
+          a.vx -= dx * 0.0008 * homing;
+          a.vy -= dy * 0.0008 * homing;
+          a.vz -= dz * 0.0008 * homing;
+        }
+
+        dummy.position.set(a.x, a.y, a.z);
+        dummy.rotation.set(a.rx, a.ry, a.rz);
+        dummy.scale.set(a.scale, a.scale, a.scale);
+        dummy.updateMatrix();
+        asteroidMesh.setMatrixAt(i, dummy.matrix);
+      }
+      asteroidMesh.instanceMatrix.needsUpdate = true;
+      if (asteroidMesh.instanceColor) asteroidMesh.instanceColor.needsUpdate = true;
+
+      // Collision: hostile asteroid vs player
+      if (player.invuln <= 0) {
+        for (let i = 0; i < ASTEROID_COUNT; i++) {
+          const a = instanceData[i];
+          if (!a.alive || !a.hostile) continue;
+          const dx = a.x - player.position.x;
+          const dy = a.y - player.position.y;
+          const dz = a.z - player.position.z;
+          const r = a.scale + 3;
+          if (dx*dx + dy*dy + dz*dz < r * r) {
+            // Hull damage
+            player.hull -= 25;
+            player.invuln = 1.2;
+            // Knock asteroid back
+            a.vx *= -1; a.vy *= -1; a.vz *= -1;
+            if (player.hull <= 0) {
+              player.hull = 0;
+              endGame();
+              return;
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // ----- HUD -----
+    const scoreEl = document.getElementById("score");
+    const hullEl = document.getElementById("hull");
+    function updateHUD() {
+      scoreEl.textContent = score;
+      hullEl.textContent = Math.max(0, Math.floor(player.hull)) + "%";
+      if (player.hull > 60) hullEl.style.color = "#4ade80";
+      else if (player.hull > 30) hullEl.style.color = "#facc15";
+      else hullEl.style.color = "#f472b6";
+    }
+
+    // ----- Main loop -----
+    function animate() {
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+      update(dt);
+      renderer.render(scene, camera);
+      updateHUD();
+      requestAnimationFrame(animate);
+    }
+
+    // Render one frame so the menu shows the asteroid field behind the overlay
+    lastTime = performance.now();
+    animate();
+  </script>
+</body>
+</html>

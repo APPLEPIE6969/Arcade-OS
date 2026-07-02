@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="color-scheme" content="dark" />
+  <title>Gravity Box</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #05060d; color: #e8f4ff;
+      font-family: "Courier New", ui-monospace, monospace;
+      overflow: hidden;
+      -webkit-user-select: none; user-select: none;
+    }
+    #wrap { position: fixed; inset: 0; }
+    canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; top: 0; left: 0; right: 0;
+      padding: 14px 18px;
+      display: flex; justify-content: space-between;
+      pointer-events: none; z-index: 5;
+      font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .hud-block {
+      background: rgba(5, 6, 13, 0.55);
+      border: 1px solid rgba(74, 222, 128, 0.25);
+      border-radius: 6px; padding: 6px 10px;
+      backdrop-filter: blur(6px);
+    }
+    .hud-label { color: rgba(232, 244, 255, 0.55); font-size: 9px; margin-bottom: 2px; }
+    .hud-value { color: #4ade80; font-weight: bold; font-size: 16px; text-shadow: 0 0 8px rgba(74,222,128,0.7); }
+    .hud-value.yellow { color: #facc15; text-shadow: 0 0 8px rgba(250,204,21,0.7); }
+    .hud-value.cyan { color: #22d3ee; text-shadow: 0 0 8px rgba(34,211,238,0.7); }
+    .overlay {
+      position: absolute; inset: 0; z-index: 10;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; padding: 24px; text-align: center;
+      background: radial-gradient(ellipse at center, rgba(5,6,13,0.75), rgba(5,6,13,0.95));
+    }
+    .overlay.hidden { display: none; }
+    .overlay h1 {
+      font-size: clamp(28px, 5vw, 56px); letter-spacing: 0.12em;
+      color: #4ade80;
+      text-shadow: 0 0 18px rgba(74, 222, 128, 0.85), 0 0 4px rgba(74, 222, 128, 0.95);
+    }
+    .overlay h1 .accent { color: #facc15; text-shadow: 0 0 18px rgba(250, 204, 21, 0.85); }
+    .overlay p { font-size: 12px; letter-spacing: 0.06em; color: rgba(232, 244, 255, 0.65); max-width: 520px; line-height: 1.6; }
+    .controls-list { display: grid; grid-template-columns: auto auto; gap: 6px 14px; font-size: 12px; color: rgba(232,244,255,0.75); }
+    .controls-list .key { color: #facc15; font-weight: bold; text-align: right; }
+    .start-btn {
+      margin-top: 6px; padding: 12px 28px; background: transparent;
+      border: 2px solid #4ade80; color: #4ade80;
+      font-family: inherit; font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase;
+      cursor: pointer; border-radius: 6px; transition: all 0.18s ease;
+      box-shadow: 0 0 14px rgba(74, 222, 128, 0.35), inset 0 0 14px rgba(74, 222, 128, 0.1);
+    }
+    .start-btn:hover { background: rgba(74, 222, 128, 0.12); transform: translateY(-1px); }
+    .hint {
+      position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;
+      font-size: 10px; letter-spacing: 0.18em; color: rgba(232,244,255,0.35);
+      pointer-events: none; z-index: 5; text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="game"></canvas>
+    <div class="hud">
+      <div class="hud-block">
+        <div class="hud-label">Level</div>
+        <div class="hud-value" id="level">1</div>
+      </div>
+      <div class="hud-block" style="text-align:center;">
+        <div class="hud-label">Stack Height</div>
+        <div class="hud-value yellow" id="height">0%</div>
+      </div>
+      <div class="hud-block" style="text-align:right;">
+        <div class="hud-label">Target</div>
+        <div class="hud-value cyan" id="target">100%</div>
+      </div>
+    </div>
+    <div class="hint">← → move crane · space drop · R reset</div>
+
+    <div class="overlay" id="start-overlay">
+      <h1>GRAVITY <span class="accent">BOX</span></h1>
+      <p>Drop crates from the crane and stack them onto the platform. Fill the height meter to clear the level — but watch out, boxes topple if you miss!</p>
+      <div class="controls-list">
+        <div class="key">← →</div><div>Move crane</div>
+        <div class="key">SPACE</div><div>Drop crate</div>
+        <div class="key">R</div><div>Reset level</div>
+      </div>
+      <button class="start-btn" id="start-btn">Start</button>
+    </div>
+
+    <div class="overlay hidden" id="win-overlay">
+      <h1>LEVEL <span class="accent">CLEAR</span></h1>
+      <p>Stack reached the target! Advancing to the next level...</p>
+    </div>
+
+    <div class="overlay hidden" id="fail-overlay">
+      <h1>STACK <span class="accent">FELL</span></h1>
+      <p>A crate missed the platform. Press <strong style="color:#facc15;">R</strong> to try this level again.</p>
+      <button class="start-btn" id="retry-btn">Retry</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+      let DPR = 1, VW = 0, VH = 0;
+
+      function resize() {
+        DPR = Math.max(1, window.devicePixelRatio || 1);
+        VW = Math.max(320, window.innerWidth);
+        VH = Math.max(240, window.innerHeight);
+        canvas.width = Math.floor(VW * DPR);
+        canvas.height = Math.floor(VH * DPR);
+        canvas.style.width = VW + "px";
+        canvas.style.height = VH + "px";
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      const STATE = { MENU: "menu", PLAYING: "playing", WIN: "win", FAIL: "fail" };
+      let state = STATE.MENU;
+      let level = 1;
+      let lastTime = 0;
+
+      // Physics constants
+      const GRAVITY = 1400;
+      const FRICTION = 0.96;
+
+      // World geometry (recomputed on resize / level change)
+      let platformX = 0, platformY = 0, platformW = 0;
+      let targetHeightPx = 0; // how tall the stack must be
+      let craneX = 0, craneY = 0;
+      let craneVX = 0;
+      let craneDir = 1;
+
+      // Entities
+      const boxes = [];        // settled boxes on the platform
+      const fallingBoxes = []; // boxes currently in free-fall
+      const particles = [];
+
+      const keys = Object.create(null);
+      window.addEventListener("keydown", function (e) {
+        if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].includes(e.key)) e.preventDefault();
+        keys[e.key] = true;
+        if (state === STATE.PLAYING && e.key === " ") dropCrate();
+        if (e.key.toLowerCase() === "r" && (state === STATE.FAIL || state === STATE.PLAYING)) resetLevel();
+      });
+      window.addEventListener("keyup", function (e) { keys[e.key] = false; });
+
+      function rand(min, max) { return Math.random() * (max - min) + min; }
+      function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+      function configureLevel() {
+        platformW = clamp(VW * 0.55, 240, 600);
+        platformX = (VW - platformW) / 2;
+        platformY = VH * 0.82;
+        // Each level adds 1 box to the target stack
+        targetHeightPx = (level + 2) * 42;
+        craneY = VH * 0.12;
+        craneX = VW / 2;
+        craneDir = 1;
+      }
+
+      function resetLevel() {
+        configureLevel();
+        boxes.length = 0;
+        fallingBoxes.length = 0;
+        particles.length = 0;
+        state = STATE.PLAYING;
+        document.getElementById("win-overlay").classList.add("hidden");
+        document.getElementById("fail-overlay").classList.add("hidden");
+        document.getElementById("start-overlay").classList.add("hidden");
+      }
+
+      function startGame() {
+        level = 1;
+        resetLevel();
+      }
+
+      document.getElementById("start-btn").addEventListener("click", startGame);
+      document.getElementById("retry-btn").addEventListener("click", resetLevel);
+
+      function dropCrate() {
+        const size = 38;
+        const colors = ["#22d3ee", "#f472b6", "#facc15", "#4ade80"];
+        fallingBoxes.push({
+          x: craneX - size / 2,
+          y: craneY + 10,
+          w: size,
+          h: size,
+          vx: craneVX * 0.3, // inherits a bit of crane momentum
+          vy: 0,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rot: 0,
+          rotSpeed: rand(-2, 2),
+        });
+      }
+
+      function spawnParticles(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+          const ang = Math.random() * Math.PI * 2;
+          const sp = rand(40, 180);
+          particles.push({
+            x: x, y: y,
+            vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 30,
+            life: rand(0.4, 0.9), maxLife: 0.9,
+            color: color, size: rand(1.5, 3.0),
+          });
+        }
+      }
+
+      function aabb(a, b) {
+        return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+      }
+
+      function getStackTopAt(x, w) {
+        // Returns the Y coordinate of the highest box surface under the footprint [x, x+w]
+        let topY = platformY; // ground = platform top
+        for (let i = 0; i < boxes.length; i++) {
+          const b = boxes[i];
+          if (b.x + b.w > x && b.x < x + w) {
+            if (b.y < topY) topY = b.y;
+          }
+        }
+        return topY;
+      }
+
+      function currentStackHeight() {
+        if (boxes.length === 0) return 0;
+        let topY = platformY;
+        for (let i = 0; i < boxes.length; i++) {
+          if (boxes[i].y < topY) topY = boxes[i].y;
+        }
+        return platformY - topY;
+      }
+
+      function update(dt) {
+        // Particles always update
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx * dt; p.y += p.vy * dt;
+          p.vy += 600 * dt;
+          p.vx *= 0.96;
+          p.life -= dt;
+          if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        if (state !== STATE.PLAYING) return;
+
+        // Crane movement — oscillates left-right automatically + player can nudge
+        const craneSpeed = 220;
+        let manualX = 0;
+        if (keys["ArrowLeft"]) manualX -= 1;
+        if (keys["ArrowRight"]) manualX += 1;
+        if (manualX !== 0) {
+          craneVX = manualX * craneSpeed;
+          craneX += craneVX * dt;
+        } else {
+          // Auto-sway
+          craneVX = craneDir * craneSpeed * 0.6;
+          craneX += craneVX * dt;
+          if (craneX > VW - 60) craneDir = -1;
+          if (craneX < 60) craneDir = 1;
+        }
+        craneX = clamp(craneX, 60, VW - 60);
+
+        // Falling boxes physics
+        for (let i = fallingBoxes.length - 1; i >= 0; i--) {
+          const b = fallingBoxes[i];
+          b.vy += GRAVITY * dt;
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          b.rot += b.rotSpeed * dt;
+          b.vx *= 0.99;
+
+          // Collision with stack or platform
+          const stackTopY = getStackTopAt(b.x, b.w);
+          const isOnPlatform = b.x + b.w > platformX && b.x < platformX + platformW;
+
+          if (b.y + b.h >= stackTopY && isOnPlatform) {
+            // Settle
+            b.y = stackTopY - b.h;
+            b.vy = 0;
+            b.vx = 0;
+            b.rot = 0;
+            b.rotSpeed = 0;
+            boxes.push(b);
+            fallingBoxes.splice(i, 1);
+            spawnParticles(b.x + b.w / 2, b.y + b.h, b.color, 8);
+
+            // Check win condition
+            if (currentStackHeight() >= targetHeightPx) {
+              state = STATE.WIN;
+              document.getElementById("win-overlay").classList.remove("hidden");
+              setTimeout(function () {
+                level++;
+                resetLevel();
+              }, 1800);
+            }
+          } else if (b.y > VH + 100) {
+            // Missed the platform entirely
+            spawnParticles(b.x + b.w / 2, VH - 20, "#f472b6", 18);
+            fallingBoxes.splice(i, 1);
+            state = STATE.FAIL;
+            document.getElementById("fail-overlay").classList.remove("hidden");
+          }
+        }
+      }
+
+      function drawBackground() {
+        // Vertical gradient
+        const grad = ctx.createLinearGradient(0, 0, 0, VH);
+        grad.addColorStop(0, "#0a1015");
+        grad.addColorStop(1, "#05060d");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, VW, VH);
+
+        // Grid floor
+        ctx.strokeStyle = "rgba(74, 222, 128, 0.08)";
+        ctx.lineWidth = 1;
+        const step = 40;
+        for (let x = 0; x < VW; x += step) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, VH);
+          ctx.stroke();
+        }
+        for (let y = 0; y < VH; y += step) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(VW, y);
+          ctx.stroke();
+        }
+      }
+
+      function drawTargetLine() {
+        const targetY = platformY - targetHeightPx;
+        ctx.save();
+        ctx.strokeStyle = "rgba(34, 211, 238, 0.6)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 6]);
+        ctx.beginPath();
+        ctx.moveTo(platformX - 20, targetY);
+        ctx.lineTo(platformX + platformW + 20, targetY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Label
+        ctx.fillStyle = "#22d3ee";
+        ctx.font = "bold 11px 'Courier New', monospace";
+        ctx.textAlign = "left";
+        ctx.shadowColor = "#22d3ee";
+        ctx.shadowBlur = 8;
+        ctx.fillText("TARGET", platformX + platformW + 26, targetY + 4);
+        ctx.restore();
+      }
+
+      function drawPlatform() {
+        ctx.save();
+        ctx.shadowColor = "#4ade80";
+        ctx.shadowBlur = 14;
+        ctx.strokeStyle = "#4ade80";
+        ctx.lineWidth = 2.5;
+        ctx.fillStyle = "rgba(74, 222, 128, 0.12)";
+        ctx.fillRect(platformX, platformY, platformW, 14);
+        ctx.strokeRect(platformX, platformY, platformW, 14);
+
+        // Surface highlight
+        ctx.strokeStyle = "rgba(74, 222, 128, 0.4)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(platformX, platformY);
+        ctx.lineTo(platformX + platformW, platformY);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawBox(b, isFalling) {
+        ctx.save();
+        const cx = b.x + b.w / 2;
+        const cy = b.y + b.h / 2;
+        ctx.translate(cx, cy);
+        ctx.rotate(b.rot);
+
+        ctx.shadowColor = b.color;
+        ctx.shadowBlur = isFalling ? 18 : 10;
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = 2;
+        ctx.fillStyle = b.color + "33"; // 20% alpha via hex append
+        ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+        ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
+
+        // Inner cross detail
+        ctx.strokeStyle = b.color + "66";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-b.w / 2, -b.h / 2);
+        ctx.lineTo(b.w / 2, b.h / 2);
+        ctx.moveTo(b.w / 2, -b.h / 2);
+        ctx.lineTo(-b.w / 2, b.h / 2);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      function drawCrane() {
+        if (state !== STATE.PLAYING && state !== STATE.FAIL) return;
+        // Rail
+        ctx.strokeStyle = "rgba(232, 244, 255, 0.15)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(40, craneY - 14);
+        ctx.lineTo(VW - 40, craneY - 14);
+        ctx.stroke();
+
+        // Crane body
+        ctx.save();
+        ctx.translate(craneX, craneY);
+        ctx.shadowColor = "#facc15";
+        ctx.shadowBlur = 14;
+        ctx.strokeStyle = "#facc15";
+        ctx.lineWidth = 2;
+        ctx.fillStyle = "rgba(250, 204, 21, 0.2)";
+        ctx.fillRect(-28, -14, 56, 18);
+        ctx.strokeRect(-28, -14, 56, 18);
+
+        // Cable
+        ctx.strokeStyle = "rgba(232, 244, 255, 0.4)";
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.moveTo(0, 4);
+        ctx.lineTo(0, 16);
+        ctx.stroke();
+
+        // Hook
+        ctx.fillStyle = "#facc15";
+        ctx.beginPath();
+        ctx.arc(0, 18, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawParticles() {
+        ctx.save();
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          const alpha = clamp(p.life / p.maxLife, 0, 1);
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 6;
+          ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+
+      function render() {
+        drawBackground();
+        drawTargetLine();
+        drawPlatform();
+        for (let i = 0; i < boxes.length; i++) drawBox(boxes[i], false);
+        for (let i = 0; i < fallingBoxes.length; i++) drawBox(fallingBoxes[i], true);
+        drawCrane();
+        drawParticles();
+      }
+
+      const levelEl = document.getElementById("level");
+      const heightEl = document.getElementById("height");
+      const targetEl = document.getElementById("target");
+      function updateHUD() {
+        levelEl.textContent = level;
+        const h = currentStackHeight();
+        const pct = Math.min(100, Math.floor((h / targetHeightPx) * 100));
+        heightEl.textContent = pct + "%";
+        targetEl.textContent = "100%";
+      }
+
+      function loop(now) {
+        const dt = Math.min(0.05, (now - lastTime) / 1000 || 0);
+        lastTime = now;
+        update(dt);
+        render();
+        updateHUD();
+        requestAnimationFrame(loop);
+      }
+      // Initial config so the menu shows the world behind it
+      configureLevel();
+      lastTime = performance.now();
+      requestAnimationFrame(loop);
+
+      // Reconfigure on resize
+      window.addEventListener("resize", function () {
+        if (state === STATE.MENU) configureLevel();
+      });
+    })();
+  </script>
+</body>
+</html>

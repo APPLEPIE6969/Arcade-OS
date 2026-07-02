@@ -1,0 +1,314 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-arcade: var(--font-press-start);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-neon-cyan: var(--neon-cyan);
+  --color-neon-magenta: var(--neon-magenta);
+  --color-neon-yellow: var(--neon-yellow);
+  --color-neon-green: var(--neon-green);
+  --color-neon-purple: var(--neon-purple);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Default (light) palette — kept for theme completeness, but the app forces dark */
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+  /* Neon accent tokens used across the arcade UI */
+  --neon-cyan: #22d3ee;
+  --neon-magenta: #f472b6;
+  --neon-yellow: #facc15;
+  --neon-green: #4ade80;
+  --neon-purple: #a855f7;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.18 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+  --neon-cyan: #22d3ee;
+  --neon-magenta: #f472b6;
+  --neon-yellow: #facc15;
+  --neon-green: #4ade80;
+  --neon-purple: #a855f7;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body {
+    @apply bg-background text-foreground;
+  }
+  /* Force the arcade dark theme regardless of system preference */
+  body {
+    background-color: #07090f;
+    color: #f4f6fb;
+  }
+
+  /* ====== Main page scrollbar — themed to match the dark arcade page ====== */
+  /* Reserve permanent space for the scrollbar gutter so the content width
+     never shifts when filtering reduces the page height below the viewport
+     (which would otherwise cause cards to reflow wider when the scrollbar
+     disappears). `scrollbar-gutter: stable` keeps the gutter open even when
+     there's nothing to scroll. */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+    scrollbar-gutter: stable;
+  }
+  /* WebKit / Chromium / Safari */
+  html::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  html::-webkit-scrollbar-track {
+    background: #07090f; /* matches the page background exactly */
+  }
+  html::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.18);
+    border-radius: 9999px;
+    border: 3px solid #07090f; /* creates the inset/gutter effect */
+  }
+  html::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(34, 211, 238, 0.45); /* neon cyan hover accent */
+  }
+  html::-webkit-scrollbar-corner {
+    background: #07090f;
+  }
+}
+
+/* ====== Arcade utility classes ====== */
+@layer utilities {
+  .text-neon-cyan {
+    color: var(--neon-cyan);
+  }
+  .text-neon-magenta {
+    color: var(--neon-magenta);
+  }
+  .text-neon-yellow {
+    color: var(--neon-yellow);
+  }
+  .text-neon-green {
+    color: var(--neon-green);
+  }
+  .text-neon-purple {
+    color: var(--neon-purple);
+  }
+  .border-neon-cyan {
+    border-color: var(--neon-cyan);
+  }
+  .bg-neon-cyan {
+    background-color: var(--neon-cyan);
+  }
+  .bg-neon-magenta {
+    background-color: var(--neon-magenta);
+  }
+  .bg-neon-purple {
+    background-color: var(--neon-purple);
+  }
+  .shadow-neon-cyan {
+    box-shadow: 0 0 18px -2px color-mix(in srgb, var(--neon-cyan) 70%, transparent),
+      0 0 4px -1px color-mix(in srgb, var(--neon-cyan) 90%, transparent);
+  }
+  .shadow-neon-magenta {
+    box-shadow: 0 0 18px -2px color-mix(in srgb, var(--neon-magenta) 70%, transparent),
+      0 0 4px -1px color-mix(in srgb, var(--neon-magenta) 90%, transparent);
+  }
+  .text-glow-cyan {
+    text-shadow: 0 0 12px color-mix(in srgb, var(--neon-cyan) 70%, transparent);
+  }
+  .text-glow-magenta {
+    text-shadow: 0 0 12px color-mix(in srgb, var(--neon-magenta) 70%, transparent);
+  }
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .bg-radial-fade {
+    background-image: radial-gradient(
+      ellipse 80% 60% at 50% 0%,
+      rgba(34, 211, 238, 0.12),
+      transparent 70%
+    );
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 9999px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* ====== Card entrance animation ====== */
+@keyframes arcade-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-card-in {
+  animation: arcade-card-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes arcade-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in {
+  animation: arcade-fade-in 0.5s ease-out both;
+}
+
+@keyframes arcade-pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 18px -2px color-mix(in srgb, var(--neon-cyan) 60%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 28px 0px color-mix(in srgb, var(--neon-cyan) 90%, transparent);
+  }
+}
+.animate-pulse-glow {
+  animation: arcade-pulse-glow 2.6s ease-in-out infinite;
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+.scanline::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(34, 211, 238, 0.06),
+    transparent
+  );
+  pointer-events: none;
+  animation: scanline 4s linear infinite;
+}

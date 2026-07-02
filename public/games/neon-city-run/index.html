@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="color-scheme" content="dark" />
+  <title>Neon City Run</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #04050a; color: #e8f4ff;
+      font-family: "Courier New", ui-monospace, monospace;
+      overflow: hidden;
+      -webkit-user-select: none; user-select: none;
+    }
+    #wrap { position: fixed; inset: 0; }
+    canvas { display: block; width: 100% !important; height: 100% !important; }
+
+    .hud {
+      position: absolute; top: 0; left: 0; right: 0;
+      padding: 14px 18px;
+      display: flex; justify-content: space-between;
+      pointer-events: none; z-index: 5;
+      font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .hud-block {
+      background: rgba(4, 5, 10, 0.55);
+      border: 1px solid rgba(244, 114, 182, 0.25);
+      border-radius: 6px; padding: 6px 10px;
+      backdrop-filter: blur(6px);
+    }
+    .hud-label { color: rgba(232, 244, 255, 0.55); font-size: 9px; margin-bottom: 2px; }
+    .hud-value { color: #f472b6; font-weight: bold; font-size: 16px; text-shadow: 0 0 8px rgba(244,114,182,0.7); }
+    .hud-value.cyan { color: #22d3ee; text-shadow: 0 0 8px rgba(34,211,238,0.7); }
+    .hud-value.yellow { color: #facc15; text-shadow: 0 0 8px rgba(250,204,21,0.7); }
+    .hud-value.green { color: #4ade80; text-shadow: 0 0 8px rgba(74,222,128,0.7); }
+
+    /* Speed lines effect overlay (only visible at high speed) */
+    .speed-lines {
+      position: absolute; inset: 0; z-index: 4;
+      pointer-events: none; opacity: 0;
+      background: radial-gradient(ellipse at center, transparent 30%, rgba(244,114,182,0.15) 100%);
+      transition: opacity 0.4s ease;
+    }
+    .speed-lines.active { opacity: 1; }
+
+    .overlay {
+      position: absolute; inset: 0; z-index: 10;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; padding: 24px; text-align: center;
+      background: radial-gradient(ellipse at center, rgba(4,5,10,0.8), rgba(4,5,10,0.95));
+    }
+    .overlay.hidden { display: none; }
+    .overlay h1 {
+      font-size: clamp(28px, 5vw, 56px); letter-spacing: 0.12em;
+      color: #f472b6;
+      text-shadow: 0 0 18px rgba(244, 114, 182, 0.85), 0 0 4px rgba(244, 114, 182, 0.95);
+    }
+    .overlay h1 .accent { color: #22d3ee; text-shadow: 0 0 18px rgba(34,211,238,0.85); }
+    .overlay p { font-size: 12px; letter-spacing: 0.06em; color: rgba(232,244,255,0.65); max-width: 560px; line-height: 1.6; }
+    .overlay .stats-line {
+      display: flex; gap: 24px; flex-wrap: wrap; justify-content: center;
+      font-size: 11px; color: rgba(232,244,255,0.5); margin-top: 4px;
+    }
+    .overlay .stats-line span { color: #facc15; font-weight: bold; }
+    .controls-list { display: grid; grid-template-columns: auto auto; gap: 6px 14px; font-size: 12px; color: rgba(232,244,255,0.75); }
+    .controls-list .key { color: #facc15; font-weight: bold; text-align: right; }
+    .start-btn {
+      margin-top: 6px; padding: 12px 28px; background: transparent;
+      border: 2px solid #f472b6; color: #f472b6;
+      font-family: inherit; font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase;
+      cursor: pointer; border-radius: 6px; transition: all 0.18s ease;
+      box-shadow: 0 0 14px rgba(244,114,182,0.35), inset 0 0 14px rgba(244,114,182,0.1);
+    }
+    .start-btn:hover { background: rgba(244,114,182,0.12); transform: translateY(-1px); }
+    .final-score { font-size: 14px; color: #facc15; letter-spacing: 0.1em; text-transform: uppercase; }
+    .final-score span { color: #f472b6; font-weight: bold; font-size: 1.4em; text-shadow: 0 0 10px rgba(244,114,182,0.7); }
+    .hint {
+      position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;
+      font-size: 10px; letter-spacing: 0.18em; color: rgba(232,244,255,0.35);
+      pointer-events: none; z-index: 5; text-transform: uppercase;
+    }
+    #fps-meter {
+      position: absolute; bottom: 10px; right: 14px; z-index: 5;
+      font-size: 10px; color: rgba(74,222,128,0.7);
+      font-family: "Courier New", monospace;
+      letter-spacing: 0.1em;
+      pointer-events: none;
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="wrap">
+    <div class="speed-lines" id="speed-lines"></div>
+
+    <div class="hud">
+      <div class="hud-block">
+        <div class="hud-label">Distance</div>
+        <div class="hud-value" id="distance">0m</div>
+      </div>
+      <div class="hud-block" style="text-align:center;">
+        <div class="hud-label">Buildings</div>
+        <div class="hud-value yellow" id="count">10000</div>
+      </div>
+      <div class="hud-block" style="text-align:right;">
+        <div class="hud-label">Speed</div>
+        <div class="hud-value cyan" id="speed">1.0x</div>
+      </div>
+    </div>
+
+    <div class="hint">A/D strafe · W/S pitch · Shift boost · R restart</div>
+    <div id="fps-meter">-- fps</div>
+
+    <div class="overlay" id="start-overlay">
+      <h1>NEON <span class="accent">CITY RUN</span></h1>
+      <p>A synthwave flight through a procedurally generated megacity. <strong style="color:#facc15;">10,000 instanced buildings</strong> rendered in a single GPU draw call via Three.js InstancedMesh — buildings recycle past you infinitely while memory stays flat.</p>
+      <div class="controls-list">
+        <div class="key">A D</div><div>Strafe ship left / right</div>
+        <div class="key">W S</div><div>Pitch ship up / down</div>
+        <div class="key">SHIFT</div><div>Boost speed</div>
+        <div class="key">R</div><div>Restart after crash</div>
+      </div>
+      <div class="stats-line">
+        <div>Engine: <span>Three.js r160</span></div>
+        <div>Instances: <span>10,000</span></div>
+        <div>Draw calls: <span>2</span></div>
+      </div>
+      <button class="start-btn" id="start-btn">Launch</button>
+    </div>
+
+    <div class="overlay hidden" id="gameover-overlay">
+      <h1>CRASH <span class="accent">OUT</span></h1>
+      <div class="final-score">Distance: <span id="final-distance">0m</span></div>
+      <p>Press <strong style="color:#facc15;">R</strong> or click below to launch again.</p>
+      <button class="start-btn" id="restart-btn">Restart</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from "three";
+
+    /* =====================================================================
+       NEON CITY RUN — Three.js InstancedMesh showcase.
+       10,000 buildings rendered as a single InstancedMesh (1 draw call).
+       Buildings recycle forward, infinite city, constant memory.
+       ===================================================================== */
+
+    const STATE = { MENU: "menu", PLAYING: "playing", GAMEOVER: "gameover" };
+    let state = STATE.MENU;
+
+    // ----- Renderer / scene / camera -----
+    const wrap = document.getElementById("wrap");
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x0a0a1f, 1);
+    wrap.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x1a0a2e, 200, 900);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(0, 40, 120);
+    camera.lookAt(0, 40, 0);
+
+    // ----- Sky gradient (large sphere with shader-free material) -----
+    const skyGeo = new THREE.SphereGeometry(1500, 32, 16);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: {
+        topColor: { value: new THREE.Color(0x0a0a1f) },
+        bottomColor: { value: new THREE.Color(0x2a0a3e) },
+        sunColor: { value: new THREE.Color(0xf472b6) },
+      },
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vWorldPos = worldPos.xyz;
+          gl_Position = projectionMatrix * viewMatrix * worldPos;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 bottomColor;
+        uniform vec3 sunColor;
+        varying vec3 vWorldPos;
+        void main() {
+          float h = normalize(vWorldPos).y;
+          vec3 col = mix(bottomColor, topColor, smoothstep(-0.1, 0.6, h));
+          // Sun glow on horizon
+          float sunBand = smoothstep(0.0, 0.15, h) * (1.0 - smoothstep(0.15, 0.4, h));
+          col = mix(col, sunColor, sunBand * 0.6);
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+    });
+    scene.add(new THREE.Mesh(skyGeo, skyMat));
+
+    // ----- Lighting -----
+    const ambient = new THREE.AmbientLight(0x6a4a8a, 0.7);
+    scene.add(ambient);
+    const sunLight = new THREE.DirectionalLight(0xf472b6, 1.2);
+    sunLight.position.set(0, 100, -300);
+    scene.add(sunLight);
+    const fillLight = new THREE.DirectionalLight(0x22d3ee, 0.5);
+    fillLight.position.set(0, 50, 200);
+    scene.add(fillLight);
+
+    // ----- The InstancedMesh: 10,000 buildings, ONE draw call -----
+    const BUILDING_COUNT = 10000;
+    // Box geometry — width/depth 1 unit, height 1 unit (we scale per-instance)
+    const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
+    const buildingMat = new THREE.MeshStandardMaterial({
+      metalness: 0.6,
+      roughness: 0.35,
+      emissive: 0x000000,
+      flatShading: false,
+    });
+    const buildingMesh = new THREE.InstancedMesh(buildingGeo, buildingMat, BUILDING_COUNT);
+    buildingMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(buildingMesh);
+
+    // Per-instance color buffer — neon color varies per building
+    const colorBuffer = new Float32Array(BUILDING_COUNT * 3);
+    buildingMesh.instanceColor = new THREE.InstancedBufferAttribute(colorBuffer, 3);
+
+    // Per-instance data
+    const buildings = [];
+    const dummy = new THREE.Object3D();
+    const tmpColor = new THREE.Color();
+    const NEON_COLORS = [0x22d3ee, 0xf472b6, 0xfacc15, 0x4ade80, 0xa855f7];
+
+    function initBuildings() {
+      // Buildings are laid out in a 100x100 grid extending into -Z
+      // Each building gets a unique position, height, and color
+      const gridSize = 100;
+      const spacing = 8;
+      for (let i = 0; i < BUILDING_COUNT; i++) {
+        const gx = i % gridSize;
+        const gz = Math.floor(i / gridSize);
+        // Center the grid around x=0; z extends from near camera into the distance
+        const x = (gx - gridSize / 2) * spacing + (Math.random() - 0.5) * 4;
+        const z = -gz * spacing - 50;
+        const width = 4 + Math.random() * 4;
+        const depth = 4 + Math.random() * 4;
+        const height = 20 + Math.random() * 180;
+        const rotY = Math.random() * Math.PI * 2;
+        const colorHex = NEON_COLORS[Math.floor(Math.random() * NEON_COLORS.length)];
+
+        buildings[i] = {
+          x: x, y: height / 2, z: z,
+          width: width, depth: depth, height: height,
+          rotY: rotY,
+          color: colorHex,
+          // windowPulse for emissive flicker
+          pulse: Math.random() * Math.PI * 2,
+        };
+
+        dummy.position.set(x, height / 2, z);
+        dummy.rotation.set(0, rotY, 0);
+        dummy.scale.set(width, height, depth);
+        dummy.updateMatrix();
+        buildingMesh.setMatrixAt(i, dummy.matrix);
+
+        tmpColor.setHex(colorHex);
+        // Dim the base color — emissive look comes from the slight tint
+        tmpColor.multiplyScalar(0.25);
+        buildingMesh.setColorAt(i, tmpColor);
+      }
+      buildingMesh.instanceMatrix.needsUpdate = true;
+      buildingMesh.instanceColor.needsUpdate = true;
+    }
+    initBuildings();
+
+    // ----- Neon grid floor -----
+    const gridHelper = new THREE.GridHelper(2000, 100, 0x22d3ee, 0x22d3ee);
+    gridHelper.material.opacity = 0.25;
+    gridHelper.material.transparent = true;
+    gridHelper.position.y = 0;
+    scene.add(gridHelper);
+
+    // Second grid above for the "ceiling" synthwave look
+    const gridTop = new THREE.GridHelper(2000, 50, 0xf472b6, 0xf472b6);
+    gridTop.material.opacity = 0.12;
+    gridTop.material.transparent = true;
+    gridTop.position.y = 400;
+    scene.add(gridTop);
+
+    // ----- Sun disk (a simple circle plane) -----
+    const sunGeo = new THREE.CircleGeometry(80, 64);
+    const sunMat = new THREE.MeshBasicMaterial({ color: 0xf472b6, transparent: true, opacity: 0.9 });
+    const sun = new THREE.Mesh(sunGeo, sunMat);
+    sun.position.set(0, 100, -900);
+    scene.add(sun);
+
+    // Sun rings (synthwave style)
+    for (let i = 0; i < 6; i++) {
+      const ringGeo = new THREE.RingGeometry(80 + i * 12, 80 + i * 12 + 3, 64);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.4 - i * 0.05 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.set(0, 100, -899);
+      scene.add(ring);
+    }
+
+    // ----- Player ship (a small mesh in front of the camera) -----
+    const shipGroup = new THREE.Group();
+    const shipBodyGeo = new THREE.ConeGeometry(2, 8, 4);
+    shipBodyGeo.rotateX(Math.PI / 2);
+    const shipBodyMat = new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x22d3ee, emissiveIntensity: 0.6, metalness: 0.7, roughness: 0.3 });
+    const shipBody = new THREE.Mesh(shipBodyGeo, shipBodyMat);
+    shipGroup.add(shipBody);
+    // Wings
+    const wingGeo = new THREE.BoxGeometry(8, 0.4, 3);
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0xf472b6, emissive: 0xf472b6, emissiveIntensity: 0.4 });
+    const wing = new THREE.Mesh(wingGeo, wingMat);
+    wing.position.z = 1;
+    shipGroup.add(wing);
+    // Engine glow
+    const engineGeo = new THREE.SphereGeometry(1.2, 8, 8);
+    const engineMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    const engine = new THREE.Mesh(engineGeo, engineMat);
+    engine.position.z = 4;
+    shipGroup.add(engine);
+    shipGroup.position.set(0, 40, 120);
+    scene.add(shipGroup);
+
+    // ----- Player state -----
+    const player = {
+      x: 0,
+      y: 40,
+      z: 120,
+      vx: 0,
+      vy: 0,
+      pitch: 0,
+      hull: 100,
+      invuln: 0,
+    };
+
+    let distance = 0;
+    let best = 0;
+    try { best = parseInt(localStorage.getItem("neon-city-run-best") || "0", 10) || 0; } catch (e) {}
+    let speedMultiplier = 1.0;
+    const BASE_SPEED = 60; // units per second
+    let boosting = false;
+
+    // ----- Input -----
+    const keys = Object.create(null);
+    window.addEventListener("keydown", function (e) {
+      keys[e.key.toLowerCase()] = true;
+      if (e.key.toLowerCase() === "r" && state === STATE.GAMEOVER) startGame();
+    });
+    window.addEventListener("keyup", function (e) {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    // ----- Resize -----
+    function onResize() {
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener("resize", onResize);
+
+    // ----- Game lifecycle -----
+    function startGame() {
+      distance = 0;
+      speedMultiplier = 1.0;
+      player.x = 0;
+      player.y = 40;
+      player.z = 120;
+      player.vx = 0;
+      player.vy = 0;
+      player.pitch = 0;
+      player.hull = 100;
+      player.invuln = 1.5;
+      initBuildings();
+      state = STATE.PLAYING;
+      document.getElementById("start-overlay").classList.add("hidden");
+      document.getElementById("gameover-overlay").classList.add("hidden");
+      document.getElementById("speed-lines").classList.remove("active");
+      lastTime = performance.now();
+    }
+
+    function endGame() {
+      state = STATE.GAMEOVER;
+      const dist = Math.floor(distance);
+      if (dist > best) {
+        best = dist;
+        try { localStorage.setItem("neon-city-run-best", String(best)); } catch (e) {}
+      }
+      document.getElementById("final-distance").textContent = dist + "m";
+      document.getElementById("gameover-overlay").classList.remove("hidden");
+      document.getElementById("speed-lines").classList.remove("active");
+    }
+
+    document.getElementById("start-btn").addEventListener("click", startGame);
+    document.getElementById("restart-btn").addEventListener("click", startGame);
+
+    // ----- Update -----
+    let lastTime = performance.now();
+    let fpsAccum = 0, fpsFrames = 0, fpsTimer = 0;
+    let gridOffset = 0;
+    let cityScrollZ = 0;
+
+    function update(dt) {
+      // FPS counter
+      fpsAccum += dt;
+      fpsFrames++;
+      fpsTimer += dt;
+      if (fpsTimer >= 0.5) {
+        const fps = Math.round(fpsFrames / fpsAccum);
+        fpsAccum = 0; fpsFrames = 0; fpsTimer = 0;
+        document.getElementById("fps-meter").textContent = fps + " fps · 2 draw calls · " + BUILDING_COUNT + " instances";
+      }
+
+      // Animate grid floor (always)
+      if (state === STATE.PLAYING) {
+        gridOffset = (gridOffset + dt * BASE_SPEED * speedMultiplier) % 8;
+        gridHelper.position.z = -gridOffset;
+        gridTop.position.z = -gridOffset;
+      }
+
+      if (state !== STATE.PLAYING) return;
+
+      // Difficulty curve — speed ramps every second
+      speedMultiplier = Math.min(4.5, 1.0 + distance / 800);
+      boosting = keys["shift"];
+      const effectiveSpeed = BASE_SPEED * speedMultiplier * (boosting ? 1.6 : 1.0);
+
+      // Distance traveled
+      distance += dt * effectiveSpeed * 1.2;
+
+      // Player control — A/D strafe, W/S pitch
+      const strafeAccel = 240;
+      if (keys["a"]) player.vx -= strafeAccel * dt;
+      if (keys["d"]) player.vx += strafeAccel * dt;
+      if (keys["w"]) player.vy += strafeAccel * dt;
+      if (keys["s"]) player.vy -= strafeAccel * dt;
+
+      player.vx *= 0.88;
+      player.vy *= 0.88;
+      player.x += player.vx * dt;
+      player.y += player.vy * dt;
+
+      // Clamp player to playable bounds
+      player.x = Math.max(-360, Math.min(360, player.x));
+      player.y = Math.max(8, Math.min(200, player.y));
+
+      if (player.invuln > 0) player.invuln -= dt;
+
+      // Ship visual updates
+      shipGroup.position.set(player.x, player.y, player.z);
+      shipGroup.rotation.z = -player.vx * 0.005;
+      shipGroup.rotation.x = player.vy * 0.005;
+
+      // Camera follows the ship
+      camera.position.set(player.x, player.y + 12, player.z + 30);
+      camera.lookAt(player.x, player.y, player.z - 100);
+
+      // Scroll buildings toward the camera; recycle to the back when they pass behind
+      const recycleZ = player.z + 100; // behind camera
+      const farZ = player.z - 800;     // far distance
+
+      for (let i = 0; i < BUILDING_COUNT; i++) {
+        const b = buildings[i];
+        // Move building toward camera by effectiveSpeed
+        b.z += effectiveSpeed * dt;
+
+        // If building has passed the camera, recycle it far ahead
+        if (b.z > recycleZ) {
+          b.z -= 850; // push it back into the distance
+          // Re-randomize its grid x position + height + color so it looks fresh
+          b.x = (Math.random() - 0.5) * 800;
+          b.height = 20 + Math.random() * 180;
+          b.y = b.height / 2;
+          b.width = 4 + Math.random() * 4;
+          b.depth = 4 + Math.random() * 4;
+          b.rotY = Math.random() * Math.PI * 2;
+          b.color = NEON_COLORS[Math.floor(Math.random() * NEON_COLORS.length)];
+        }
+
+        // Update the per-instance matrix
+        dummy.position.set(b.x, b.y, b.z);
+        dummy.rotation.set(0, b.rotY, 0);
+        dummy.scale.set(b.width, b.height, b.depth);
+        dummy.updateMatrix();
+        buildingMesh.setMatrixAt(i, dummy.matrix);
+
+        // Subtle emissive flicker on a per-instance color tint
+        b.pulse += dt * 2;
+        const flicker = 0.18 + Math.sin(b.pulse + i * 0.13) * 0.08;
+        tmpColor.setHex(b.color).multiplyScalar(flicker);
+        buildingMesh.setColorAt(i, tmpColor);
+      }
+      buildingMesh.instanceMatrix.needsUpdate = true;
+      if (buildingMesh.instanceColor) buildingMesh.instanceColor.needsUpdate = true;
+
+      // Speed lines visual at high velocity
+      if (speedMultiplier > 2.5 || boosting) {
+        document.getElementById("speed-lines").classList.add("active");
+      } else {
+        document.getElementById("speed-lines").classList.remove("active");
+      }
+
+      // Crash detection — bounding sphere vs nearby buildings
+      if (player.invuln <= 0) {
+        const playerR = 4;
+        for (let i = 0; i < BUILDING_COUNT; i++) {
+          const b = buildings[i];
+          // Quick z-cull
+          if (b.z < player.z - 30 || b.z > player.z + 10) continue;
+          const dx = b.x - player.x;
+          const dy = b.y - player.y;
+          const dz = b.z - player.z;
+          const r = Math.max(b.width, b.depth) / 2 + playerR;
+          // AABB-ish: check x/z radius, then check y range
+          if (dx * dx + dz * dz < r * r) {
+            // Check y range — building spans [0, b.height]
+            if (player.y < b.height + playerR && player.y > -playerR) {
+              endGame();
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    // ----- HUD -----
+    const distanceEl = document.getElementById("distance");
+    const speedEl = document.getElementById("speed");
+    function updateHUD() {
+      distanceEl.textContent = Math.floor(distance) + "m";
+      speedEl.textContent = speedMultiplier.toFixed(1) + "x";
+    }
+
+    // ----- Main loop -----
+    function animate() {
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+      update(dt);
+      renderer.render(scene, camera);
+      updateHUD();
+      requestAnimationFrame(animate);
+    }
+
+    // Render one frame so the menu shows the city behind the overlay
+    lastTime = performance.now();
+    animate();
+  </script>
+</body>
+</html>

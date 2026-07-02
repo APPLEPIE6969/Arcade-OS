@@ -108,45 +108,8 @@ function GameCard({ game, index }: { game: Game; index: number }) {
           </div>
         )}
 
-        {/* Play overlay — the icon fades in directly (no parent opacity
-            transition) so backdrop-blur on the icon itself interpolates
-            cleanly instead of snapping once the fade completes. */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div
-            className={cn(
-              "flex h-14 w-14 scale-90 items-center justify-center rounded-full border opacity-0 backdrop-blur-md transition-all duration-300 group-hover:scale-100 group-hover:opacity-100",
-              game.accent === "cyan" && "border-neon-cyan/60 bg-neon-cyan/10",
-              game.accent === "magenta" &&
-                "border-neon-magenta/60 bg-neon-magenta/10",
-              game.accent === "yellow" &&
-                "border-neon-yellow/60 bg-neon-yellow/10",
-              game.accent === "purple" &&
-                "border-neon-purple/60 bg-neon-purple/10",
-            )}
-          >
-            {game.openInNewTab ? (
-              <ExternalLink
-                className={cn(
-                  "h-6 w-6",
-                  game.accent === "cyan" && "text-neon-cyan",
-                  game.accent === "magenta" && "text-neon-magenta",
-                  game.accent === "yellow" && "text-neon-yellow",
-                  game.accent === "purple" && "text-neon-purple",
-                )}
-              />
-            ) : (
-              <Joystick
-                className={cn(
-                  "h-6 w-6",
-                  game.accent === "cyan" && "text-neon-cyan",
-                  game.accent === "magenta" && "text-neon-magenta",
-                  game.accent === "yellow" && "text-neon-yellow",
-                  game.accent === "purple" && "text-neon-purple",
-                )}
-              />
-            )}
-          </div>
-        </div>
+        {/* Play overlay removed — hover effect is just thumbnail zoom
+            plus the border glow from accentRingMap. No popping icon. */}
       </div>
 
       {/* Body */}

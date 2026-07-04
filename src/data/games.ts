@@ -353,13 +353,13 @@ export const games: Game[] = [
     title: "Eaglercraft 26.1.2",
     slug: "eaglercraft",
     description:
-      "Eaglercraft 26.1.2 — a full browser-based Minecraft sandbox compiled to JavaScript via TeaVM. Build, mine, and survive in a voxel world running in pure WebGL.",
+      "Eaglercraft 26.1.2 — a WebGPU-powered Minecraft sandbox in a single self-contained 62 MB HTML file. Build, mine, and survive in a voxel world rendered via WebGPU for native-feeling framerates.",
     longDescription:
-      "Eaglercraft 26.1.2 is a fully playable browser port of Minecraft, compiled to JavaScript via TeaVM and bundled with the game's complete asset library into a custom EPK format — together they total roughly 400 MB of game data, all of which loads client-side with zero server-side world generation required. This is the official Eaglercraft 26.1.2 release: the build's own version stamp is visible in the page title and metadata. Singleplayer worlds are saved to your browser's IndexedDB, so progress persists between sessions. Multiplayer is supported via public Eaglercraft relay servers (WebSockets), letting you join any Eaglercraft-compatible server straight from the browser. The full sandbox experience is here: survival mode, creative mode, all block types, mob AI, redstone, crafting, and everything else the engine ships with. It runs at native framerates inside any modern browser via WebGL, no Java plugin or desktop install needed. The game is loaded inside a sandboxed iframe with pointer-lock enabled, so once you click into the game your mouse is captured for proper first-person camera control — press Esc to release.",
+      "Eaglercraft 26.1.2 (novix-u0-v1.1 build) is a fully playable browser port of Minecraft that targets WebGPU instead of the WebGL + TeaVM pipeline used by older Eaglercraft builds. The entire game — code, assets, textures, sounds — is packed into a single self-contained 62 MB HTML file with no external asset bundles to fetch, which means no remote loader, no asset download progress bar, and no Google Drive dependency. The game boots instantly once the HTML loads. WebGPU is the modern successor to WebGL: it offers lower-overhead access to the GPU, native compute shaders, and dramatically better performance on complex scenes — but it requires a recent browser (Chrome 113+, Edge 113+, or any Chromium-based browser with hardware acceleration enabled). Firefox and Safari do not yet have stable WebGPU support as of mid-2026, so users on those browsers should use the Eaglercraft 1.21.11 WASM build instead. Singleplayer worlds persist to IndexedDB between sessions. The full Minecraft 26.1.2 sandbox is playable: survival, creative, mob AI, redstone, crafting, all block types. Loaded inside the portal's sandboxed iframe with pointer-lock enabled for first-person camera control. If the game shows a 'No WebGPU' error, enable hardware acceleration in your browser settings (chrome://settings/system) and check chrome://gpu for blocklisted drivers.",
     category: "3D",
     thumbnail: eaglercraftThumbnail,
     sourceUrl: "/games/eaglercraft/index.html",
-    tags: ["3d", "voxel", "sandbox", "minecraft", "webgl", "survival", "eaglercraft", "26.1.2"],
+    tags: ["3d", "voxel", "sandbox", "minecraft", "webgpu", "survival", "eaglercraft", "26.1.2", "novix"],
     controls: [
       { keys: "Mouse", action: "Look around (click to lock pointer)" },
       { keys: "W A S D", action: "Move player" },
@@ -369,6 +369,14 @@ export const games: Game[] = [
       { keys: "Left Click", action: "Mine block / attack" },
       { keys: "Right Click", action: "Place block / use item" },
       { keys: "Esc", action: "Release pointer / open menu" },
+    ],
+    requirements: [
+      {
+        title: "WebGPU browser required",
+        body:
+          "This build of Eaglercraft 26.1.2 uses WebGPU (the modern successor to WebGL) and will not run on browsers without it. Use Chrome 113+, Edge 113+, or any Chromium-based browser with hardware acceleration enabled. Firefox and Safari are NOT supported — switch to the Eaglercraft 1.21.11 WASM build if you're on one of those. If you see a 'No GPU adapter' error, enable 'Use hardware acceleration' in chrome://settings/system and check chrome://gpu for blocklisted drivers.",
+        severity: "warning",
+      },
     ],
     trending: true,
     accent: "yellow",
@@ -381,7 +389,7 @@ export const games: Game[] = [
     description:
       "Eaglercraft 1.21.11 compiled to WebAssembly (WASM) — a leaner, faster Minecraft 1.21.11 sandbox build that runs in modern browsers via native WebAssembly. Same voxel world, smaller bundle.",
     longDescription:
-      "Eaglercraft 1.21.11 WASM is a newer-generation browser port of Minecraft 1.21.11 that targets WebAssembly instead of compiling to plain JavaScript via TeaVM. WebAssembly produces smaller bundles and faster startup than the older JavaScript transpilation pipeline — that's why this build is roughly 48 MB compared to the 402 MB Eaglercraft 26.1.2 TeaVM build. The trade-off is browser support: WASM requires a recent browser, so older browsers may fail to launch the game. Singleplayer worlds persist to IndexedDB between sessions, and multiplayer is wired to the same public Eaglercraft relay network as the other builds. The full Minecraft 1.21.11 sandbox is playable: survival, creative, mob AI, redstone, crafting, all block types. Loaded inside the portal's sandboxed iframe with pointer-lock enabled for first-person camera control. IMPORTANT: this build ships without a default player skin. You MUST import your own skin before launching the game — without one, the game will fail to render the player model and may refuse to start. An example 64×64 PNG skin (a gamer-slime character) is provided as a download in the Requirements banner above the canvas; save it locally and import it through the in-game skin picker on the title screen.",
+      "Eaglercraft 1.21.11 WASM is a newer-generation browser port of Minecraft 1.21.11 that targets WebAssembly instead of compiling to plain JavaScript via TeaVM. WebAssembly produces smaller bundles and faster startup than the older JavaScript transpilation pipeline — that's why this build is roughly 48 MB. The trade-off is browser support: WASM requires a recent browser, so older browsers may fail to launch the game. Singleplayer worlds persist to IndexedDB between sessions, and multiplayer is wired to the same public Eaglercraft relay network as the other builds. The full Minecraft 1.21.11 sandbox is playable: survival, creative, mob AI, redstone, crafting, all block types. Loaded inside the portal's sandboxed iframe with pointer-lock enabled for first-person camera control. IMPORTANT: this build ships without a default player skin. You MUST import your own skin before launching the game — without one, the game will fail to render the player model and may refuse to start. An example 64×64 PNG skin (a gamer-slime character) is provided as a download in the Requirements banner above the canvas; save it locally and import it through the in-game skin picker on the title screen.",
     category: "3D",
     thumbnail: eaglercraftWasmThumbnail,
     sourceUrl: "/games/eaglercraft-1-21-11-wasm/index.html",

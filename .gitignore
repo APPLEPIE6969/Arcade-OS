@@ -52,6 +52,6 @@ prompt
 server.log
 # Skills directory
 /skills/
-# Large game asset files (exceed GitHub's 100MB limit)
-# Run scripts/download-eaglercraft-assets.sh to fetch them after cloning
-public/games/eaglercraft/assets.epk
+
+# Uploaded source archives (extracted into the project)
+upload/
